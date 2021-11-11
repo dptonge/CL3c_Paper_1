@@ -1,0 +1,641 @@
+# MACS2 Narrow Peaks files used as input into multiIntersectBed
+
+# Parse our Columns 1, 2, 3 from multIntersectBed file
+        # Cut -f 1-3 MultiIntersect.bed > JustCol123.bed
+
+# Refine genomic intervals using bedtools to collapse or merge overlaps;
+        # bedtools merge -i JustCol123.bed > Collapsed.bed
+
+# Refine genomic intervals AGAIN using bedtools to collapse or merge intervals within 25bp of each other;       
+        # bedtools merge -i Collapsed.bed -d 25 > Collapsed25bp.bed 
+
+# USE SLOP to extend the intervals to ensure the directional part is included. Add 50bp to each interval to be sure.
+        # bedtools slop -i Collapsed25bp.bed -g Chromosome.sizes -b 50 > Collapsed25bp_SLOP50.bed
+
+# collapse again as slop may have extended internals into each other...
+        # bedtools merge -i Collapsed25bp_SLOP50.bed -d 25 > Collapsed25bp_SLOP50_Collapsed25.bed 
+
+# Determine the coverage of each insert in all study samples - "coverage data"
+        # bedtools multicov -q 20 -bams > Coverage_Collapsed25_SLOP50_MAPQ20.txt
+
+
+# Set working directory
+        setwd("/04NOV21")
+        getwd()
+
+# Read in coverage data
+        InsertCoverage <- read.delim("Coverage_Collapsed25_SLOP50_MAPQ20.txt", header = FALSE)
+
+# Summarise coverage data (shows raw, non-normalised min, max, mean coverage data)
+        summary(InsertCoverage)
+
+# How many different inserts are there?
+        dim(InsertCoverage)
+
+# Rename columns based upon the multicov command to ensure consistency
+        names(InsertCoverage)[4] <- "GenomeDigest1_All"
+        names(InsertCoverage)[5] <- "GenomeDigest2_All"
+        names(InsertCoverage)[6] <- "CL3c1_All" #CrazyLib1_All
+        names(InsertCoverage)[7] <- "CL3c2_All" #CL3c2_All
+        names(InsertCoverage)[8] <- "JCPZ_A_All"
+        names(InsertCoverage)[9] <- "JCPZ_B_All"
+        names(InsertCoverage)[10] <- "JCPZ_C_All"
+        names(InsertCoverage)[11] <- "JCPZ_D_All"
+        names(InsertCoverage)[12] <- "MF_A_All"
+        names(InsertCoverage)[13] <- "MF_B_All"
+        names(InsertCoverage)[14] <- "MF_C_All"
+        names(InsertCoverage)[15] <- "MF_D_All"
+        names(InsertCoverage)[16] <- "MFZ_A_All"
+        names(InsertCoverage)[17] <- "MFZ_B_All"
+        names(InsertCoverage)[18] <- "MFZ_C_All"
+        names(InsertCoverage)[19] <- "MFZ_D_All"
+        names(InsertCoverage)[20] <- "GenomeDigest1_Directional"
+        names(InsertCoverage)[21] <- "GenomeDigest2_Directional"
+        names(InsertCoverage)[22] <- "CrazyLib1_Directional"
+        names(InsertCoverage)[23] <- "CrazyLib2_Directional"
+        names(InsertCoverage)[24] <- "JCPZ_A_Directional"
+        names(InsertCoverage)[25] <- "JCPZ_B_Directional"
+        names(InsertCoverage)[26] <- "JCPZ_C_Directional"
+        names(InsertCoverage)[27] <- "JCPZ_D_Directional"
+        names(InsertCoverage)[28] <- "MF_A_Directional"
+        names(InsertCoverage)[29] <- "MF_B_Directional"
+        names(InsertCoverage)[30] <- "MF_C_Directional"
+        names(InsertCoverage)[31] <- "MF_D_Directional"
+        names(InsertCoverage)[32] <- "MFZ_A_Directional"
+        names(InsertCoverage)[33] <- "MFZ_B_Directional"
+        names(InsertCoverage)[34] <- "MFZ_C_Directional"
+        names(InsertCoverage)[35] <- "MFZ_D_Directional"
+
+# How many reads map to the library derived inserts, per sample?
+        CoverageTotals <- colSums(InsertCoverage[, 4:35])
+        CoverageTotals <- as.data.frame(CoverageTotals)
+        CoverageTotalsPerMillion <- as.data.frame(CoverageTotals/1000000)
+
+# Determine the number of replicates in each experimental group that are "positive" for a given insert (>9 reads mapping)
+        InsertCoverage$MF_Positive <- rowSums(InsertCoverage[, 12:15] >9)
+        InsertCoverage$MFZ_Positive <- rowSums(InsertCoverage[, 16:19] >9)
+        InsertCoverage$JCPZ_Positive <- rowSums(InsertCoverage[, 8:11] >9)
+        InsertCoverage$CLC3_Positive <- rowSums(InsertCoverage[, 6:7] >9)
+
+
+# Determine how many different inserts there are. How many are present in each sample group?
+# Make a True False Table to show which samples each insert is expressed in (suggest minimum 10 reads across insert length) 
+# Note: All reads only - doesn't filter based upon directional reads due to the low number of these
+
+        CoverageTrueFalse <- (InsertCoverage[, 4:19] >9)
+        colSums(CoverageTrueFalse == "TRUE")
+        CoverageNumberTrue <- as.data.frame(colSums(CoverageTrueFalse == "TRUE"))
+        CoverageNumberTrue$Inserts <- CoverageNumberTrue$`colSums(CoverageTrueFalse == "TRUE")`
+        CoverageNumberTrue$Sample <- rownames(CoverageNumberTrue)
+        CoverageNumberTrue$Group = c("GD", "GD", "CLC3", "CLC3", "JCPZ", "JCPZ", "JCPZ", "JCPZ", "MF", "MF", "MF", "MF", "MFZ", "MFZ", "MFZ", "MFZ")
+
+# ------- Normalisation ------- #
+
+# Normalise coverage data to the number of mapped reads - normalise all count data to the column total i.e insert expression relative to total reads mapping to inserts per sample.
+        Normalised <- as.data.frame(scale(InsertCoverage[, 4:35], center = FALSE, scale = colSums(InsertCoverage[, 4:35])))
+        typeof(Normalised)
+
+# Express as mapped reads per million mapped reads
+        Normalised_ReadsPerMillion <- (Normalised*1000000)
+
+# _______ Additional housekeeping ________#
+
+# Add Chromosome, Start and Stop, and calculate Length Field
+        Normalised_ReadsPerMillion$Chromosome <- InsertCoverage$V1
+        Normalised_ReadsPerMillion$Start <- InsertCoverage$V2
+        Normalised_ReadsPerMillion$Stop <-InsertCoverage$V3
+
+# Pull number of replicates positive from InsertCoverage Data.Frame and add Length Information
+        Normalised_ReadsPerMillion$JCPZ_Positive <-InsertCoverage$JCPZ_Positive
+        Normalised_ReadsPerMillion$MF_Positive <-InsertCoverage$MF_Positive
+        Normalised_ReadsPerMillion$MFZ_Positive <-InsertCoverage$MFZ_Positive
+        Normalised_ReadsPerMillion$Length <- Normalised_ReadsPerMillion$Stop - Normalised_ReadsPerMillion$Start
+
+# _________Additional Calculated Fields ___________#
+
+# Add additional calculated fields
+        Normalised_ReadsPerMillion$CL3cMean <- (Normalised_ReadsPerMillion$CL3c1_All+Normalised_ReadsPerMillion$CL3c2_All)/2
+        Normalised_ReadsPerMillion$GenomicDigestMean <- (Normalised_ReadsPerMillion$GenomeDigest1_All+Normalised_ReadsPerMillion$GenomeDigest2_All)/2
+
+        Normalised_ReadsPerMillion$JCPZMean <- (Normalised_ReadsPerMillion$JCPZ_A_All+Normalised_ReadsPerMillion$JCPZ_B_All+Normalised_ReadsPerMillion$JCPZ_C_All+Normalised_ReadsPerMillion$JCPZ_D_All)/4
+        Normalised_ReadsPerMillion$MFZMean <- (Normalised_ReadsPerMillion$MFZ_A_All+Normalised_ReadsPerMillion$MFZ_B_All+Normalised_ReadsPerMillion$MFZ_C_All+Normalised_ReadsPerMillion$MFZ_D_All)/4
+        Normalised_ReadsPerMillion$MFMean <- (Normalised_ReadsPerMillion$MF_A_All+Normalised_ReadsPerMillion$MF_B_All+Normalised_ReadsPerMillion$MF_C_All+Normalised_ReadsPerMillion$MF_D_All)/4
+        Normalised_ReadsPerMillion$MF_NoD_Mean <- (Normalised_ReadsPerMillion$MF_A_All+Normalised_ReadsPerMillion$MF_B_All+Normalised_ReadsPerMillion$MF_C_Al)/3
+
+        Normalised_ReadsPerMillion$MFZ_Potentiation <- (Normalised_ReadsPerMillion$MFZMean/Normalised_ReadsPerMillion$JCPZMean)*100
+        Normalised_ReadsPerMillion$MF_Potentiation <- (Normalised_ReadsPerMillion$MFMean/Normalised_ReadsPerMillion$JCPZMean)*100
+        Normalised_ReadsPerMillion$MF_NoD_Potentiation <- (Normalised_ReadsPerMillion$MF_NoD_Mean/Normalised_ReadsPerMillion$JCPZMean)*100
+        Normalised_ReadsPerMillion[Normalised_ReadsPerMillion == Inf] <- 0
+
+# Consider Insert Length: RPMperKb - Reads Per Million Mapped Per Kilobase of Insert
+        Normalised_ReadsPerMillion$CL3cMeanRPMperKb <- ((Normalised_ReadsPerMillion$CL3c1_All+Normalised_ReadsPerMillion$CL3c2_All)/2)/(Normalised_ReadsPerMillion$Length/1000)
+        Normalised_ReadsPerMillion$JCPZMeanRPMperKb <- ((Normalised_ReadsPerMillion$JCPZ_A_All+Normalised_ReadsPerMillion$JCPZ_B_All+Normalised_ReadsPerMillion$JCPZ_C_All+Normalised_ReadsPerMillion$JCPZ_D_All)/4)/(Normalised_ReadsPerMillion$Length/1000)
+        Normalised_ReadsPerMillion$MFZMeanRPMperKb <- ((Normalised_ReadsPerMillion$MFZ_A_All+Normalised_ReadsPerMillion$MFZ_B_All+Normalised_ReadsPerMillion$MFZ_C_All+Normalised_ReadsPerMillion$MFZ_D_All)/4)/(Normalised_ReadsPerMillion$Length/1000)
+        Normalised_ReadsPerMillion$MFMeanRPMperKb <- ((Normalised_ReadsPerMillion$MF_A_All+Normalised_ReadsPerMillion$MF_B_All+Normalised_ReadsPerMillion$MF_C_All+Normalised_ReadsPerMillion$MF_D_All)/4)/(Normalised_ReadsPerMillion$Length/1000)
+
+# Add mean "Directional Library reads" field to enable selecting only those reads with directional support
+Normalised_ReadsPerMillion$MeanDirectionalSupport <- (Normalised_ReadsPerMillion$CrazyLib1_Directional + Normalised_ReadsPerMillion$CrazyLib1_Directional + Normalised_ReadsPerMillion$JCPZ_A_Directional + Normalised_ReadsPerMillion$JCPZ_B_Directional + Normalised_ReadsPerMillion$JCPZ_C_Directional + Normalised_ReadsPerMillion$JCPZ_D_Directional + Normalised_ReadsPerMillion$MFZ_A_Directional + Normalised_ReadsPerMillion$MFZ_B_Directional + Normalised_ReadsPerMillion$MFZ_C_Directional + Normalised_ReadsPerMillion$MFZ_D_Directional + Normalised_ReadsPerMillion$MF_A_Directional + Normalised_ReadsPerMillion$MF_B_Directional + Normalised_ReadsPerMillion$MF_C_Directional + Normalised_ReadsPerMillion$MF_D_Directional)/14
+
+# Remove INF values (where insert missing from Crazy Library and therefore impossible to divide JCPZ value by it)
+Normalised_ReadsPerMillion[Normalised_ReadsPerMillion == Inf] <- 0
+
+# Add MF/MFZ Mean Column
+Normalised_ReadsPerMillion$MF_MFZRatio <- (Normalised_ReadsPerMillion$MFMean/Normalised_ReadsPerMillion$MFZMean)
+Normalised_ReadsPerMillion$MF_MFZRatioRPMperKb <- (Normalised_ReadsPerMillion$MFMeanRPMperKb/Normalised_ReadsPerMillion$MFZMeanRPMperKb)
+
+
+# Publication Figure 5
+     
+     par(mfrow=c(2,3))
+     CLC3Plot <- hist(Normalised_ReadsPerMillion$CL3cMean, main="CL3c Insert Presence", xlab ="Reads Mapped to Insert", ylim =c(0, 50), xlim = c(0, max(Normalised_ReadsPerMillion$CL3cMean)), breaks = 100)
+     lines(density(Normalised_ReadsPerMillion$CL3cMean), col = "yellow", lwd = 1, lty = 2)                                                                                                                                                                                                                                                                                                                                 
+     abline(v = mean(Normalised_ReadsPerMillion$CL3cMean), col = "royalblue", lwd = 1)                                                                                                                                                                                                                                                                                                                              
+     abline(v = median(Normalised_ReadsPerMillion$CL3cMean), col = "red", lwd = 1)  
+     mean(Normalised_ReadsPerMillion$CL3cMean)
+     median(Normalised_ReadsPerMillion$CL3cMean)
+     legend(x = "topright", c("Density Plot", "Mean", "Median"), col = c("yellow", "royalblue", "red"), lwd = c(2, 2, 2), cex = 0.5)
+     
+     
+     JCPZPlot <- hist(Normalised_ReadsPerMillion$JCPZMean, main="d0 (JCPZ) Insert Presence", xlab ="Reads Mapped to Insert", ylim =c(0, 50), xlim = c(0, max(Normalised_ReadsPerMillion$JCPZMean)), breaks = 100)
+     lines(density(Normalised_ReadsPerMillion$JCPZMean), col = "yellow", lwd = 1, lty = 2)                                                                                                                                                                                                                                                                                                                                 
+     abline(v = mean(Normalised_ReadsPerMillion$JCPZMean), col = "royalblue", lwd = 1)                                                                                                                                                                                                                                                                                                                              
+     abline(v = median(Normalised_ReadsPerMillion$JCPZMean), col = "red", lwd = 1)  
+     mean(Normalised_ReadsPerMillion$JCPZMean)
+     median(Normalised_ReadsPerMillion$JCPZMean)
+     legend(x = "topright", c("Density Plot", "Mean", "Median"), col = c("yellow", "royalblue", "red"), lwd = c(2, 2, 2), cex = 0.5)
+     
+     MFZPlot <- hist(Normalised_ReadsPerMillion$MFZMean, main="d47 (MFZ) Insert Presence", xlab ="Reads Mapped to Insert", ylim =c(0, 50), xlim = c(0, max(Normalised_ReadsPerMillion$MFZMean)), breaks = 100)
+     lines(density(Normalised_ReadsPerMillion$MFZMean), col = "yellow", lwd = 1, lty = 2)                                                                                                                                                                                                                                                                                                                                 
+     abline(v = mean(Normalised_ReadsPerMillion$MFZMean), col = "royalblue", lwd = 1)                                                                                                                                                                                                                                                                                                                              
+     abline(v = median(Normalised_ReadsPerMillion$MFZMean), col = "red", lwd = 1)  
+     mean(Normalised_ReadsPerMillion$MFZMean)
+     median(Normalised_ReadsPerMillion$MFZMean)
+     legend(x = "topright", c("Density Plot", "Mean", "Median"), col = c("yellow", "royalblue", "red"), lwd = c(2, 2, 2), cex = 0.5)
+     
+     MFPlot <- hist(Normalised_ReadsPerMillion$MFMean, main="d47 + anti FAS (MF) Insert Presence", xlab ="Reads Mapped to Insert", ylim =c(0, 50), xlim = c(0, max(Normalised_ReadsPerMillion$MFMean)), breaks = 100)
+     lines(density(Normalised_ReadsPerMillion$MFMean), col = "yellow", lwd = 1, lty = 2)                                                                                                                                                                                                                                                                                                                                 
+     abline(v = mean(Normalised_ReadsPerMillion$MFMean), col = "royalblue", lwd = 1)                                                                                                                                                                                                                                                                                                                              
+     abline(v = median(Normalised_ReadsPerMillion$MFMean), col = "red", lwd = 1)  
+     mean(Normalised_ReadsPerMillion$MFMean)
+     median(Normalised_ReadsPerMillion$MFMean)
+     legend(x = "topright", c("Density Plot", "Mean", "Median"), col = c("yellow", "royalblue", "red"), lwd = c(2, 2, 2), cex = 0.5)
+     
+     MF_No_DPlot <- hist(Normalised_ReadsPerMillion$MF_NoD_Mean, main="d47 + anti FAS (MF NoD) Insert Presence", xlab ="Reads Mapped to Insert", ylim =c(0, 50), xlim = c(0, max(Normalised_ReadsPerMillion$MF_NoD_Mean)), breaks = 100)
+     lines(density(Normalised_ReadsPerMillion$MF_NoD_Mean), col = "yellow", lwd = 1, lty = 2)                                                                                                                                                                                                                                                                                                                                 
+     abline(v = mean(Normalised_ReadsPerMillion$MF_NoD_Mean), col = "royalblue", lwd = 1)                                                                                                                                                                                                                                                                                                                              
+     abline(v = median(Normalised_ReadsPerMillion$MF_NoD_Mean), col = "red", lwd = 1)  
+     mean(Normalised_ReadsPerMillion$MF_NoD_Mean)
+     median(Normalised_ReadsPerMillion$MF_NoD_Mean)
+     legend(x = "topright", c("Density Plot", "Mean", "Median"), col = c("yellow", "royalblue", "red"), lwd = c(2, 2, 2), cex = 0.5)
+
+# Publication Figure 5 data as a box plot
+     
+     par(mfrow=c(2,2))
+     boxplot(Normalised_ReadsPerMillion$CL3cMean)
+     boxplot(Normalised_ReadsPerMillion$JCPZMean)
+     boxplot(Normalised_ReadsPerMillion$MFZMean)
+     boxplot(Normalised_ReadsPerMillion$MFMean)
+     
+
+# _________ Complement the expression matrix (Normalised_ReadsPerMillion) with a range of annotation data ___________# 
+
+# Known genes described in GRCh38.p13 comprehensive gene annotation superset  
+        options(scipen = 100)
+        BiotypeInfo <- rtracklayer::import("gencode.v38.chr_patch_hapl_scaff.annotation.gtf")
+        BiotypeInfo=as.data.frame(BiotypeInfo)
+        BiotypeInfo_Reduced <- data.frame(BiotypeInfo$seqnames, BiotypeInfo$start, BiotypeInfo$end, BiotypeInfo$type, BiotypeInfo$gene_type, BiotypeInfo$gene_name, BiotypeInfo$gene_id)
+
+#Issue with some coordinates being identical i.e. start and stop! Add 1 to stop
+        BiotypeInfo_Reduced$BiotypeInfo.end <- (BiotypeInfo_Reduced$BiotypeInfo.end + 1)
+        BiotypeInfo_GeneLevel <- subset(BiotypeInfo_Reduced, BiotypeInfo_Reduced$BiotypeInfo.type =="gene")
+        write.table(BiotypeInfo_GeneLevel, file =  "GenCode.GENELEVEL.bed", append = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+# Select exon level entries i.e. the (RNA) expressed portions of the genome. Note: transcript level still includes introns as it is the entire expressed region prior to splicing
+        BiotypeInfo_ExonLevel <- subset(BiotypeInfo_Reduced, BiotypeInfo_Reduced$BiotypeInfo.type =="exon")
+        write.table(BiotypeInfo_ExonLevel, file =  "GenCode.EXONLEVEL.bed", append = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+# Develop custom "intron level" bed dataset
+# First sort GENE and EXON LEVEL bed datasets sort-bed IN > OUT.sorted.bed
+# bedtools subtract -nonamecheck -a GenCode.GENELEVEL.sort.bed -b GenCode.EXONLEVEL.sort.bed > GenCode.INTRONS.bed
+
+# Determine the identity of the library derived inserts through closest features analysis
+        
+        closest-features --closest --dist Intervals.bed GenCode.GENELEVEL.sort.bed > ClosestFeatures_GENE.bed
+        closest-features --closest --dist GenCode.EXONLEVEL.sort.bed > ClosestFeatures_EXON.bed 
+        closest-features --closest --dist GenCode.INTRONS.sort.bed > ClosestFeatures_INTRONS.bed
+
+# Load new data into R and check the dimensions match those expected in the InsertCoverage dataframe.
+
+        ClosestFeaturesGENELEVEL <- read.delim("ClosestFeatures_GENE.bed", header = FALSE)
+        ClosestFeaturesEXONLEVEL <- read.delim("ClosestFeatures_EXON.bed", header = FALSE)
+        ClosestFeaturesINTRONLEVEL <- read.delim("ClosestFeatures_INTRONS.bed", header = FALSE)
+        library(splitstackshape)
+        ClosestFeaturesGENELEVEL <- cSplit(ClosestFeaturesGENELEVEL, "V9", "|")
+        ClosestFeaturesEXONLEVEL <- cSplit(ClosestFeaturesEXONLEVEL, "V9", "|")
+        ClosestFeaturesINTRONLEVEL <- cSplit(ClosestFeaturesINTRONLEVEL, "V9", "|")
+
+# Add additional information to Normalised_ReadsPerMillion
+        dim(Normalised_ReadsPerMillion)
+        dim(ClosestFeaturesGENELEVEL)
+        dim(ClosestFeaturesEXONLEVEL)
+        dim(ClosestFeaturesINTRONLEVEL)
+
+        Normalised_ReadsPerMillion$GenCode.GeneLEVEL.FeatureType <- ClosestFeaturesGENELEVEL$V6
+        Normalised_ReadsPerMillion$GenCode.GeneLEVEL.BioType <- ClosestFeaturesGENELEVEL$V7
+        Normalised_ReadsPerMillion$GenCode.GeneLEVEL.KnownGeneID <- ClosestFeaturesGENELEVEL$V9_1
+        Normalised_ReadsPerMillion$GenCode.GeneLEVEL.KnownGeneName <- ClosestFeaturesGENELEVEL$V8
+        Normalised_ReadsPerMillion$GenCode.GeneLEVEL.Distance <- ClosestFeaturesGENELEVEL$V9_2
+
+        Normalised_ReadsPerMillion$GenCode.ExonLEVEL.FeatureType <- ClosestFeaturesEXONLEVEL$V6
+        Normalised_ReadsPerMillion$GenCode.ExonLEVEL.BioType <- ClosestFeaturesEXONLEVEL$V7
+        Normalised_ReadsPerMillion$GenCode.ExonLEVEL.KnownGeneID <- ClosestFeaturesEXONLEVEL$V9_1
+        Normalised_ReadsPerMillion$GenCode.ExonLEVEL.KnownGeneName <- ClosestFeaturesEXONLEVEL$V8
+        Normalised_ReadsPerMillion$GenCode.ExonLEVEL.Distance <- ClosestFeaturesEXONLEVEL$V9_2
+
+        Normalised_ReadsPerMillion$GenCode.Intronic.FeatureType <- ClosestFeaturesINTRONLEVEL$V6
+        Normalised_ReadsPerMillion$GenCode.Intronic.BioType <- ClosestFeaturesINTRONLEVEL$V7
+        Normalised_ReadsPerMillion$GenCode.Intronic.KnownGeneID <- ClosestFeaturesINTRONLEVEL$V9_1
+        Normalised_ReadsPerMillion$GenCode.Intronic.KnownGeneName <- ClosestFeaturesINTRONLEVEL$V8
+        Normalised_ReadsPerMillion$GenCode.Intronic.Distance <- ClosestFeaturesINTRONLEVEL$V9_2
+
+
+# Perform closest features analysis with hits considered by Sarropolous et al and add to Normalised_ReadsPerMillion
+        SarropolousFeatures <- read.delim("NearestSarropolous.bed", header = FALSE)
+        dim(SarropolousFeatures)
+        dim(InsertCoverage)
+        library(splitstackshape)
+        SarropolousFeatures <- cSplit(SarropolousFeatures, "V5", "|")
+        summary(SarropolousFeatures)
+        dim(Normalised_ReadsPerMillion)
+        dim(SarropolousFeatures)
+        Normalised_ReadsPerMillion$SarropolousFeatureEND <- SarropolousFeatures$V5_1
+        Normalised_ReadsPerMillion$SarropolousFeatureDISTANCE <- SarropolousFeatures$V5_2
+        dim(Normalised_ReadsPerMillion)
+        summary(Normalised_ReadsPerMillion)
+
+# Perform closest features analysis with hits considered by Liu et al and add to Normalised_ReadsPerMillion
+        LiuFeatures <- read.delim("NearestLiu.bed", header = FALSE)
+        dim(Normalised_ReadsPerMillion)
+        dim(LiuFeatures)
+        LiuFeatures <- cSplit(LiuFeatures, "V5", "|")
+        dim(Normalised_ReadsPerMillion)
+        dim(LiuFeatures)
+        Normalised_ReadsPerMillion$LiuFeatureEND <- LiuFeatures$V5_1
+        Normalised_ReadsPerMillion$LiuFeatureDISTANCE <- LiuFeatures$V5_2
+
+# Pull restriction site data and add to Normalised_ReadsPerMillion to calculate each insert is from a valid restriction site
+        BiocManager::install("HiTC")
+        BiocManager::install("rtracklayer")
+        BiocManager::install("BSgenome")
+        BiocManager::install("BSgenome.Hsapiens.UCSC.hg38")
+        library("HiTC")
+        library("rtracklayer")
+        library("BSgenome")
+        library("BSgenome.Hsapiens.UCSC.hg38")
+        human_chr <- seqlevels(BSgenome.Hsapiens.UCSC.hg38)[1:25]
+        resFrag <- getRestrictionFragmentsPerChromosome(resSite="TTTAAA", chromosomes=human_chr, overhangs5=0,    genomePack="BSgenome.Hsapiens.UCSC.hg38")
+        allRF <- do.call("c",resFrag)
+        names(allRF) <- unlist(sapply(resFrag, function(x){paste0("HIC_", seqlevels(x), "_", 1:length(x))}))
+
+# Modify BED file, which contains the resulting fragments rather than the sites by using the start coordinates and making a new calculated field for the end coordinates (+6)
+        options(scipen = 999)
+        Dra1<- as.data.frame(allRF)
+        Dra1$end_1 <- Dra1$start+6
+        Dra1_Format <- Dra1[,c(1,2,6)]
+        write.table(Dra1_Format, "Dra1Format.bed", append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+        human_chr <- seqlevels(BSgenome.Hsapiens.UCSC.hg38)[1:25]
+        resFrag1 <- getRestrictionFragmentsPerChromosome(resSite="TTATAA", chromosomes=human_chr, overhangs5=0,    genomePack="BSgenome.Hsapiens.UCSC.hg38")
+        allRF1 <- do.call("c",resFrag1)
+        names(allRF1) <- unlist(sapply(resFrag1, function(x){paste0("HIC_", seqlevels(x), "_", 1:length(x))}))
+
+# Modify BED file, which contains the resulting fragments rather than the sites by using the start coordinates and making a new calculated field for the end coordinates (+6)
+        Aan1<- as.data.frame(allRF1)
+        Aan1$end_1 <- Aan1$start+6
+        Aan1_Format <- Aan1[,c(1,2,6)]
+        write.table(Aan1_Format, "Aan1Format.bed", append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+# Run closest features and import data into Normalised_ReadsPerMillion
+        Dra1Sites <- read.delim("Dra1Sites.bed", header = FALSE)
+        Aan1Sites <- read.delim("Aan1Sites.bed", header = FALSE)
+        Dra1Sites <- cSplit(Dra1Sites, "V5", "|")
+        Aan1Sites <- cSplit(Aan1Sites, "V5", "|")
+        Normalised_ReadsPerMillion$Dra1DISTANCE <- Dra1Sites$V5_2
+        Normalised_ReadsPerMillion$Aan1DISTANCE <- Aan1Sites$V5_2
+
+
+# Pull data from lncipedia dataset
+# Download lncpedia from here: https://lncipedia.org/downloads/lncipedia_5_2/full-database/lncipedia_5_2_hg38.bed
+# Download lncpedia High Confidence (HC) from here: https://lncipedia.org/downloads/lncipedia_5_2/high-confidence-set/lncipedia_5_2_hc_hg38.bed
+# sort-bed input > output.sorted.bed
+# closest-features --closest --dist Intervals.bed lncipedia_5_2_hg38.sorted.bed > Nearestlncipedia_5_2_hg38.bed
+# closest-features --closest --dist Intervals.bed lncipedia_5_2_hc_hg38.sorted.bed > Nearestlncipedia_5_2_HChg38.bed
+
+# Load Data into R and add to Normalised_ReadsPerMillion | Note: both standard and high confidence data included
+        lncpedia_5_2_hg38HITS <- read.delim("Nearestlncipedia_5_2_hg38.bed", header = FALSE)
+        lncpedia_5_2_hg38HITS_Format <- cSplit(lncpedia_5_2_hg38HITS, "V14", "|")
+        Normalised_ReadsPerMillion$lncpediaHIT <- lncpedia_5_2_hg38HITS_Format$V6
+        Normalised_ReadsPerMillion$lncpediaHITEndCoord <- lncpedia_5_2_hg38HITS_Format$V4
+        Normalised_ReadsPerMillion$lncpediaHITDistance <- lncpedia_5_2_hg38HITS_Format$V14_2
+
+        lncpedia_5_2_hg38HITS_HC <- read.delim("Nearestlncipedia_5_2_HChg38.bed", header = FALSE)
+        lncpedia_5_2_hg38HITS_HC_Format <- cSplit(lncpedia_5_2_hg38HITS_HC, "V14", "|")
+        Normalised_ReadsPerMillion$lncpediaHIT_HC <- lncpedia_5_2_hg38HITS_HC_Format$V6
+        Normalised_ReadsPerMillion$lncpediaHITEndCoord_HC <- lncpedia_5_2_hg38HITS_HC_Format$V4
+        Normalised_ReadsPerMillion$lncpediaHITDistance_HC <- lncpedia_5_2_hg38HITS_HC_Format$V14_2
+
+# Pull data from lncipedia dataset  Cancer LncRNA Census Database https://www.gold-lab.org/resources and add to Normalised_ReadsPerMillion
+        CancerLncRNADatabase <- read.csv("CancerLncRNACensus_Modified.csv", header = TRUE)
+        CancerLncRNADatabase$Chr <- paste0("chr", CancerLncRNADatabase$Chr, sep ="")
+        write.table(CancerLncRNADatabase[, 1:4], "CancerLncRNADatabase.bed", append = FALSE, sep = "\t", dec = ".", row.names = FALSE, col.names = FALSE, quote = FALSE)
+        CancerLncRNACensusHITS <- read.delim("CancerLncRNACensus_Hits.bed", header = FALSE)
+        CancerLncRNACensusHITS_Format <- cSplit(CancerLncRNACensusHITS, "V6", "|")
+        Normalised_ReadsPerMillion$CancerLncRNACensusHIT <- CancerLncRNACensusHITS_Format$V6_1
+        Normalised_ReadsPerMillion$CancerLncRNACensusHITDist <- CancerLncRNACensusHITS_Format$V6_2
+
+
+#------- Begin to filter the Normalised_ReadsPerMillion Dataset -------#  
+        
+# Subset Normalised_ReadsPerMillion to retain only those hits with directional read support
+        Normalised_ReadsPerMillion_JustDirectionalSupport <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$MeanDirectionalSupport > 0)
+        
+# Subset Normalised_ReadsPerMillion to retain only those hits Restriction Enzymes Sites within 100bp
+        Normalised_ReadsPerMillion_JustConfirmedDra1Sites <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$Dra1DISTANCE <100 & Normalised_ReadsPerMillion$Dra1DISTANCE >-100)
+        Normalised_ReadsPerMillion_JustConfirmedAan1Sites <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$Aan1DISTANCE <100 & Normalised_ReadsPerMillion$Aan1DISTANCE >-100)
+        Normalised_ReadsPerMillion_EitherSite <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$Dra1DISTANCE <100 & Normalised_ReadsPerMillion$Dra1DISTANCE >-100 | Normalised_ReadsPerMillion$Aan1DISTANCE <100 & Normalised_ReadsPerMillion$Aan1DISTANCE >-100)
+        
+# Subset on directional read support AND RE site - VERY HIGH CONFIDENCE
+        Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite <-subset(Normalised_ReadsPerMillion_EitherSite, Normalised_ReadsPerMillion_EitherSite$MeanDirectionalSupport >0)
+
+# Check impact of subsetting
+        dim(Normalised_ReadsPerMillion)
+        dim(Normalised_ReadsPerMillion_JustDirectionalSupport)
+        dim(Normalised_ReadsPerMillion_JustConfirmedDra1Sites)
+        dim(Normalised_ReadsPerMillion_JustConfirmedAan1Sites)
+        dim(Normalised_ReadsPerMillion_EitherSite)
+        dim(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite)
+
+# Select hits with DIRECTIONAL READS > 0.2 across any sample and identified in a minimum of 3 replicates
+
+        MFZ_Selected_Min3Reps_DirectionalSupport.bed <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$MFZMean>0 & Normalised_ReadsPerMillion$MFZ_Positive>2 & Normalised_ReadsPerMillion$MeanDirectionalSupport >0.2)
+        MF_Selected_Min3Reps_DirectionalSupport.bed <-subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$MFMean>0 & Normalised_ReadsPerMillion$MF_Positive>2 & Normalised_ReadsPerMillion$MeanDirectionalSupport >0.2)
+        MF_NoD_Selected_Min3Reps_DirectionalSupport.bed <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$MF_NoD_Mean>0 & Normalised_ReadsPerMillion$MF_Positive>2 & Normalised_ReadsPerMillion$MeanDirectionalSupport >0.2)
+        dim(MF_NoD_Selected_Min3Reps_DirectionalSupport.bed)
+        dim(MF_Selected_Min3Reps_DirectionalSupport.bed)
+        dim(MFZ_Selected_Min3Reps_DirectionalSupport.bed)
+        
+# Add some further calculated fields for directional support specific to the contrasts...i.e. directional suppport can be 0.2 specific to MF rather than across the entire experiment.
+        MFZ_Selected_Min3Reps_DirectionalSupport.bed$MFZ_DirectionalSupport <- ((MFZ_Selected_Min3Reps_DirectionalSupport.bed$MFZ_A_Directional + MFZ_Selected_Min3Reps_DirectionalSupport.bed$MFZ_B_Directional + MFZ_Selected_Min3Reps_DirectionalSupport.bed$MFZ_C_Directional + MFZ_Selected_Min3Reps_DirectionalSupport.bed$MFZ_D_Directional)/4)
+        MF_Selected_Min3Reps_DirectionalSupport.bed$MF_DirectionalSupport <- ((MF_Selected_Min3Reps_DirectionalSupport.bed$MF_A_Directional + MF_Selected_Min3Reps_DirectionalSupport.bed$MF_B_Directional + MF_Selected_Min3Reps_DirectionalSupport.bed$MF_C_Directional + MF_Selected_Min3Reps_DirectionalSupport.bed$MF_D_Directional)/4)
+        MF_NoD_Selected_Min3Reps_DirectionalSupport.bed$MF_NoD_DirectionalSupport <- ((MF_NoD_Selected_Min3Reps_DirectionalSupport.bed$MF_A_Directional + MF_NoD_Selected_Min3Reps_DirectionalSupport.bed$MF_B_Directional + MF_NoD_Selected_Min3Reps_DirectionalSupport.bed$MF_C_Directional)/3)
+
+# Make directional support conditional on specific contrast i.e must be 0.2 for MF_NoD in that dataset, etc.
+        MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport.bed$MF_NoD_DirectionalSupport >0.2)
+        MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed <- subset(MF_Selected_Min3Reps_DirectionalSupport.bed, MF_Selected_Min3Reps_DirectionalSupport.bed$MF_DirectionalSupport >0.2)
+        MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed <- subset(MFZ_Selected_Min3Reps_DirectionalSupport.bed, MFZ_Selected_Min3Reps_DirectionalSupport.bed$MFZ_DirectionalSupport >0.2)
+        dim(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed)
+        dim(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed)
+        dim(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed)
+
+# Writeout the inserts that are present in > 3 replicates and have CONDITION SPECIFIC directional reads 
+        write.csv(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, "MF_NoD_Selected_Min3Reps_SpecificDirectionalSupport_PAPER.csv")
+        write.csv(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, "MF_Selected_Min3Reps_SpecificDirectionalSupport_PAPER.csv")
+        write.csv(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, "MFZ_Selected_Min3Reps_SpecificDirectionalSupport_PAPER.csv")
+        
+# Work with intersecting the paper lists...intersect for numbers, and merge for more details..
+
+        CombinedMF_MFZHits_PAPER <- merge(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, by = "Stop" )
+        CombinedMF_MF_NoDHits_PAPER <- merge(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, by = "Stop" )
+        CombinedMF_NoD_MFZHits_PAPER <- merge(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, by = "Stop" )
+        dim(CombinedMF_MFZHits_PAPER)
+        dim(CombinedMF_MF_NoDHits_PAPER)
+        dim(CombinedMF_NoD_MFZHits_PAPER)
+        write.csv(CombinedMF_MFZHits_PAPER, "CombinedMF_MFZHits_PAPER_SpecificDirectionalSupport_PAPER.csv")
+        write.csv(CombinedMF_MF_NoDHits_PAPER, "CombinedMF_MF_NoDHits_PAPER_SpecificDirectionalSupport_PAPER.csv")
+        write.csv(CombinedMF_NoD_MFZHits_PAPER, "CombinedMF_NoD_MFZHits_PAPER_SpecificDirectionalSupport_PAPER.csv")
+
+# Consider BIOTYPE of all inserts and then SELECTED insert populations, in each case. Perform at insert level and inform with reads mapped.
+# Remember, three different levels of bed are now available; gene (the entire feature), exons (essentially the cDNA from each gene?), introns (gene - all exons)
+# Need to hone in on those hits that actually overlay a feature as lowest distance is reported and this could be large...
+# Use subset =0 for this purpose apart from gene level which use 100
+
+BiotypeDistribution_ALLINSERTS_GeneLevel <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$GenCode.GeneLEVEL.FeatureType == "gene" & Normalised_ReadsPerMillion$GenCode.GeneLEVEL.Distance < 100 & Normalised_ReadsPerMillion$GenCode.GeneLEVEL.Distance > -100 )
+BiotypeDistribution_ALLINSERTS_ExonLevel <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$GenCode.ExonLEVEL.FeatureType == "exon" & Normalised_ReadsPerMillion$GenCode.ExonLEVEL.Distance == "0")
+BiotypeDistribution_ALLINSERTS_Introns <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$GenCode.Intronic.Distance == "0")
+dim(Normalised_ReadsPerMillion)
+dim(BiotypeDistribution_ALLINSERTS_GeneLevel) # Map somewhere within known features
+dim(BiotypeDistribution_ALLINSERTS_ExonLevel) # Map to the exons of known features (cDNA equivalent)
+dim(BiotypeDistribution_ALLINSERTS_Introns) # Map to the introns of known features
+
+BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel <- subset(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.FeatureType == "gene" & MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.Distance < 100 & MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.Distance > -100 )
+BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel <- subset(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.ExonLEVEL.FeatureType == "exon" & MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.ExonLEVEL.Distance == "0")
+BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_Introns <- subset(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.Intronic.Distance == "0")
+dim(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed)
+
+dim(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel) # Map somewhere within known features
+dim(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel) # Map to the exons of known features (cDNA equivalent)
+dim(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_Introns) # Map to the introns of known features
+
+BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel <- subset(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.FeatureType == "gene" & MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.Distance < 100 & MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.Distance > -100 )
+BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel <- subset(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.ExonLEVEL.FeatureType == "exon" & MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.ExonLEVEL.Distance == "0")
+BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_Introns <- subset(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.Intronic.Distance == "0")
+dim(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed)
+
+dim(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel) # Map somewhere within known features
+dim(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel) # Map to the exons of known features (cDNA equivalent)
+dim(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_Introns) # Map to the introns of known features
+
+BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.FeatureType == "gene" & MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.Distance < 100 & MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.GeneLEVEL.Distance > -100)
+BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.ExonLEVEL.FeatureType == "exon" & MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.ExonLEVEL.Distance == "0")
+BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_Introns <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$GenCode.Intronic.Distance == "0")
+dim(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed)
+
+dim(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel) # Map somewhere within known features
+dim(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel) # Map to the exons of known features (cDNA equivalent)
+dim(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_Introns) # Map to the introns of known features
+
+
+# Whats the distibution of the inserts in each case?
+
+# Simple - how many inserts map to know features in each case? And what are these features...done at the gene level
+BiotypeDistribution_ALLINSERTS_GeneLevel$GenCode.GeneLEVEL.BioType <- as.factor(BiotypeDistribution_ALLINSERTS_GeneLevel$GenCode.GeneLEVEL.BioType)
+summary(BiotypeDistribution_ALLINSERTS_GeneLevel$GenCode.GeneLEVEL.BioType)
+
+BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType <- as.factor(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType)
+summary(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType)
+
+BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType <- as.factor(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType)
+summary(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType)
+
+BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType <- as.factor(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType)
+summary(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_GeneLevel$GenCode.GeneLEVEL.BioType)
+
+# cDNA level - Map to the EXONS of known features (just the defined exons of each gene / excluding the introns)
+BiotypeDistribution_ALLINSERTS_ExonLevel$GenCode.ExonLEVEL.BioType <- as.factor(BiotypeDistribution_ALLINSERTS_ExonLevel$GenCode.ExonLEVEL.BioType)
+summary(BiotypeDistribution_ALLINSERTS_ExonLevel$GenCode.ExonLEVEL.BioType)
+
+BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType <- as.factor(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType)
+summary(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType)
+
+BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType <- as.factor(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType)
+summary(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType)
+
+BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType <- as.factor(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType)
+summary(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_ExonLevel$GenCode.ExonLEVEL.BioType)
+
+# Introns - inserts mapping to the introns of genes. Note: not intergenic regions (intergenic are "the rest" i.e. not mapping to any gene feature)
+BiotypeDistribution_ALLINSERTS_Introns$GenCode.Intronic.BioType <- as.factor(BiotypeDistribution_ALLINSERTS_Introns$GenCode.Intronic.BioType)
+summary(BiotypeDistribution_ALLINSERTS_Introns$GenCode.Intronic.BioType)
+
+BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType <- as.factor(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType)
+summary(BiotypeDistribution_MFZ_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType)
+
+BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType <- as.factor(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType)
+summary(BiotypeDistribution_MF_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType)
+
+BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType <- as.factor(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType)
+summary(BiotypeDistribution_MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER_Introns$GenCode.Intronic.BioType)
+
+
+
+Min3Reps_PAPER_MF_CancerLncRNACensus <- subset(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$CancerLncRNACensusHITDist < 100 & MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$CancerLncRNACensusHITDist >-100)
+Min3Reps_PAPER_MF_NoD_CancerLncRNACensus <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$CancerLncRNACensusHITDist < 100 & MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$CancerLncRNACensusHITDist >-100)
+Min3Reps_PAPER_MFZ_CancerLncRNACensus <- subset(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$CancerLncRNACensusHITDist < 100 & MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$CancerLncRNACensusHITDist >-100)
+CombinedMF_MF_NoDHits_PAPER_CancerLncRNACensus <- subset(CombinedMF_MF_NoDHits_PAPER, CombinedMF_MF_NoDHits_PAPER$CancerLncRNACensusHITDist.x < 100 & CombinedMF_MF_NoDHits_PAPER$CancerLncRNACensusHITDist.x >-100)
+CombinedMF_MFZHits_PAPER_CancerLncRNACensus <- subset(CombinedMF_MFZHits_PAPER, CombinedMF_MFZHits_PAPER$CancerLncRNACensusHITDist.x < 100 & CombinedMF_MFZHits_PAPER$CancerLncRNACensusHITDist.x >-100)
+CombinedMF_NoD_MFZHits_PAPER_CancerLncRNACensus <- subset(CombinedMF_NoD_MFZHits_PAPER, CombinedMF_NoD_MFZHits_PAPER$CancerLncRNACensusHITDist.x < 100 & CombinedMF_NoD_MFZHits_PAPER$CancerLncRNACensusHITDist.x >-100)
+
+dim(Min3Reps_PAPER_MF_CancerLncRNACensus)
+dim(Min3Reps_PAPER_MF_NoD_CancerLncRNACensus)
+dim(Min3Reps_PAPER_MFZ_CancerLncRNACensus)
+dim(CombinedMF_MF_NoDHits_PAPER_CancerLncRNACensus)
+dim(CombinedMF_MFZHits_PAPER_CancerLncRNACensus)
+dim(CombinedMF_NoD_MFZHits_PAPER_CancerLncRNACensus)
+
+Min3Reps_PAPER_MF_lncipedia <- subset(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance < 100 & MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance >-100)
+Min3Reps_PAPER_MF_NoD_lncipedia <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance < 100 & MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance >-100)
+Min3Reps_PAPER_MFZ_lncipedia <- subset(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance < 100 & MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance >-100)
+
+CombinedMF_MF_NoDHits_PAPER_lncipedia <- subset(CombinedMF_MF_NoDHits_PAPER, CombinedMF_MF_NoDHits_PAPER$lncpediaHITDistance.x < 100 & CombinedMF_MF_NoDHits_PAPER$lncpediaHITDistance.x >-100)
+CombinedMF_MFZHits_PAPER_lncipedia <- subset(CombinedMF_MFZHits_PAPER, CombinedMF_MFZHits_PAPER$lncpediaHITDistance.x < 100 & CombinedMF_MFZHits_PAPER$lncpediaHITDistance.x >-100)
+CombinedMF_NoD_MFZHits_PAPER_lncipedia <- subset(CombinedMF_NoD_MFZHits_PAPER, CombinedMF_NoD_MFZHits_PAPER$lncpediaHITDistance.x < 100 & CombinedMF_NoD_MFZHits_PAPER$lncpediaHITDistance.x >-100)
+
+dim(Min3Reps_PAPER_MF_lncipedia)
+dim(Min3Reps_PAPER_MF_NoD_lncipedia)
+dim(Min3Reps_PAPER_MFZ_lncipedia)
+dim(CombinedMF_MF_NoDHits_PAPER_lncipedia)
+dim(CombinedMF_MFZHits_PAPER_lncipedia)
+dim(CombinedMF_NoD_MFZHits_PAPER_lncipedia)
+
+Min3Reps_PAPER_MF_lncipediaHC <- subset(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance_HC < 100 & MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance_HC >-100)
+Min3Reps_PAPER_MF_NoD_lncipediaHC <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance_HC < 100 & MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance_HC >-100)
+Min3Reps_PAPER_MFZ_lncipediaHC <- subset(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance_HC < 100 & MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$lncpediaHITDistance_HC >-100)
+CombinedMF_MF_NoDHits_PAPER_lncipediaHC <- subset(CombinedMF_MF_NoDHits_PAPER, CombinedMF_MF_NoDHits_PAPER$lncpediaHITDistance_HC.x < 100 & CombinedMF_MF_NoDHits_PAPER$lncpediaHITDistance_HC.x >-100)
+CombinedMF_MFZHits_PAPER_lncipediaHC <- subset(CombinedMF_MFZHits_PAPER, CombinedMF_MFZHits_PAPER$lncpediaHITDistance_HC.x < 100 & CombinedMF_MFZHits_PAPER$lncpediaHITDistance_HC.x >-100)
+CombinedMF_NoD_MFZHits_PAPER_lncipediaHC <- subset(CombinedMF_NoD_MFZHits_PAPER, CombinedMF_NoD_MFZHits_PAPER$lncpediaHITDistance_HC.x < 100 & CombinedMF_NoD_MFZHits_PAPER$lncpediaHITDistance_HC.x >-100)
+
+dim(Min3Reps_PAPER_MF_lncipediaHC)
+dim(Min3Reps_PAPER_MF_NoD_lncipediaHC)
+dim(Min3Reps_PAPER_MFZ_lncipediaHC)
+dim(CombinedMF_MF_NoDHits_PAPER_lncipediaHC)
+dim(CombinedMF_MFZHits_PAPER_lncipediaHC)
+dim(CombinedMF_NoD_MFZHits_PAPER_lncipediaHC)
+
+Min3Reps_PAPER_MF_Liu <- subset(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$LiuFeatureDISTANCE < 100 & MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$LiuFeatureDISTANCE >-100)
+Min3Reps_PAPER_MF_NoD_Liu <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$LiuFeatureDISTANCE < 100 & MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$LiuFeatureDISTANCE >-100)
+Min3Reps_PAPER_MFZ_Liu <- subset(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$LiuFeatureDISTANCE < 100 & MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$LiuFeatureDISTANCE >-100)
+CombinedMF_MF_NoDHits_PAPER_Liu <- subset(CombinedMF_MF_NoDHits_PAPER, CombinedMF_MF_NoDHits_PAPER$LiuFeatureDISTANCE.x < 100 & CombinedMF_MF_NoDHits_PAPER$LiuFeatureDISTANCE.x >-100)
+CombinedMF_MFZHits_PAPER_Liu <- subset(CombinedMF_MFZHits_PAPER, CombinedMF_MFZHits_PAPER$LiuFeatureDISTANCE.x < 100 & CombinedMF_MFZHits_PAPER$LiuFeatureDISTANCE.x >-100)
+CombinedMF_NoD_MFZHits_PAPER_Liu <- subset(CombinedMF_NoD_MFZHits_PAPER, CombinedMF_NoD_MFZHits_PAPER$LiuFeatureDISTANCE.x < 100 & CombinedMF_NoD_MFZHits_PAPER$LiuFeatureDISTANCE.x >-100)
+
+
+dim(Min3Reps_PAPER_MF_Liu)
+dim(Min3Reps_PAPER_MF_NoD_Liu)
+dim(Min3Reps_PAPER_MFZ_Liu)
+dim(CombinedMF_MF_NoDHits_PAPER_Liu)
+dim(CombinedMF_MFZHits_PAPER_Liu)
+dim(CombinedMF_NoD_MFZHits_PAPER_Liu)
+
+
+Min3Reps_PAPER_MF_Sarro <- subset(MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$SarropolousFeatureDISTANCE < 100 & MF_Selected_Min3Reps_DirectionalSupport_PAPER.bed$SarropolousFeatureDISTANCE >-100)
+Min3Reps_PAPER_MF_NoD_Sarro <- subset(MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$SarropolousFeatureDISTANCE < 100 & MF_NoD_Selected_Min3Reps_DirectionalSupport_PAPER.bed$SarropolousFeatureDISTANCE >-100)
+Min3Reps_PAPER_MFZ_Sarro <- subset(MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed, MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$SarropolousFeatureDISTANCE < 100 & MFZ_Selected_Min3Reps_DirectionalSupport_PAPER.bed$SarropolousFeatureDISTANCE >-100)
+CombinedMF_MF_NoDHits_PAPER_Sarro <- subset(CombinedMF_MF_NoDHits_PAPER, CombinedMF_MF_NoDHits_PAPER$SarropolousFeatureDISTANCE.x < 100 & CombinedMF_MF_NoDHits_PAPER$SarropolousFeatureDISTANCE.x >-100)
+CombinedMF_MFZHits_PAPER_Sarro <- subset(CombinedMF_MFZHits_PAPER, CombinedMF_MFZHits_PAPER$SarropolousFeatureDISTANCE.x < 100 & CombinedMF_MFZHits_PAPER$SarropolousFeatureDISTANCE.x >-100)
+CombinedMF_NoD_MFZHits_PAPER_Sarro <- subset(CombinedMF_NoD_MFZHits_PAPER, CombinedMF_NoD_MFZHits_PAPER$SarropolousFeatureDISTANCE.x < 100 & CombinedMF_NoD_MFZHits_PAPER$SarropolousFeatureDISTANCE.x >-100)
+dim(Min3Reps_PAPER_MF_Sarro)
+dim(Min3Reps_PAPER_MF_NoD_Sarro)
+dim(Min3Reps_PAPER_MFZ_Sarro)
+dim(CombinedMF_MF_NoDHits_PAPER_Sarro)
+dim(CombinedMF_MFZHits_PAPER_Sarro)
+dim(CombinedMF_NoD_MFZHits_PAPER_Sarro)
+
+# Subset entire dataset based upon proximety to specific parameters.
+
+# Near Cancer lncRNA Census lncRNAs
+        Map_to_CancerLncRNACensuswithin100bp <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$CancerLncRNACensusHITDist <100 & Normalised_ReadsPerMillion$CancerLncRNACensusHITDist >-100)
+
+# Near Sarropolous lncRNAs
+        Map_to_Sarropolous_lncRNAwithin100bp <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$SarropolousFeatureDISTANCE <100 & Normalised_ReadsPerMillion$SarropolousFeatureDISTANCE >-100)
+
+# Near Liu lncRNAs
+        Map_to_Liuwithin100bp <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$LiuFeatureDISTANCE <100 & Normalised_ReadsPerMillion$LiuFeatureDISTANCE >-100)
+
+# Near known lncRNAs (lncpedia_5_2_hg38)
+        Map_to_KnownlncRNAswithin100bp <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$lncpediaHITDistance <100 & Normalised_ReadsPerMillion$lncpediaHITDistance >-100)
+
+# Near known lncRNAs (lncpedia_5_2_hg38) HIGH CONFIDENCE DATABASE
+        Map_to_KnownlncRNAs_HC_within100bp <- subset(Normalised_ReadsPerMillion, Normalised_ReadsPerMillion$lncpediaHITDistance_HC <100 & Normalised_ReadsPerMillion$lncpediaHITDistance_HC >-100)
+
+# How many inserts satisfy each condition
+
+        dim(Map_to_CancerLncRNACensuswithin100bp)
+        dim(Map_to_KnownlncRNAswithin100bp)
+        dim(Map_to_Sarropolous_lncRNAwithin100bp)
+        dim(Map_to_Liuwithin100bp)
+        dim(Map_to_Liuwithin1Kb)
+        dim(Map_to_Liuwithin5Kb)
+        dim(Map_to_LiuANDSarropolouswithin100bp)
+
+# Re-run Prioritisation Algorithms with Highest Confidence (Directional and RE Site within 100bp)
+
+# Known genes
+
+        BiotypeDistribution_ALLINSERTS_GeneLevelHIGHCONFIDENCE <- subset(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$GenCode.GeneLEVEL.FeatureType == "gene" & Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$GenCode.GeneLEVEL.Distance < 100 & Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$GenCode.GeneLEVEL.Distance > -100 )
+        BiotypeDistribution_ALLINSERTS_ExonLevelHIGHCONFIDENCE <- subset(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$GenCode.ExonLEVEL.FeatureType == "exon" & Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$GenCode.ExonLEVEL.Distance == "0")
+        BiotypeDistribution_ALLINSERTS_IntronsHIGHCONFIDENCE <- subset(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$GenCode.Intronic.Distance == "0")
+        dim(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite)
+        dim(BiotypeDistribution_ALLINSERTS_GeneLevelHIGHCONFIDENCE) # Map somewhere within known features
+        dim(BiotypeDistribution_ALLINSERTS_ExonLevelHIGHCONFIDENCE) # Map to the exons of known features (cDNA equivalent)
+        dim(BiotypeDistribution_ALLINSERTS_IntronsHIGHCONFIDENCE) # Map to the introns of known features
+
+# Near Cancer lncRNA Census
+        Map_to_CancerLncRNACensuswithin100bpHIGHCONFIDENCE <- subset(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$CancerLncRNACensusHITDist <100 & Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$CancerLncRNACensusHITDist >-100)
+        dim(Map_to_CancerLncRNACensuswithin100bpHIGHCONFIDENCE)
+
+# Near Sarropolous lncRNAs
+        Map_to_Sarropolous_lncRNAwithin100bpHIGHCONFIDENCE <- subset(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$SarropolousFeatureDISTANCE <100 & Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$SarropolousFeatureDISTANCE >-100)
+        dim(Map_to_Sarropolous_lncRNAwithin100bpHIGHCONFIDENCE)
+
+# Near Liu lncRNAs
+        Map_to_Liuwithin100bpHIGHCONFIDENCE <- subset(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$LiuFeatureDISTANCE <100 & Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$LiuFeatureDISTANCE >-100)
+        dim(Map_to_Liuwithin100bpHIGHCONFIDENCE)
+
+# Near known lncRNAs (lncpedia_5_2_hg38)
+        Map_to_KnownlncRNAswithin100bpHIGHCONFIDENCE <- subset(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$lncpediaHITDistance <100 & Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$lncpediaHITDistance >-100)
+        Map_to_KnownlncRNAsHCDatabasewithin100bpHIGHCONFIDENCE <- subset(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$lncpediaHITDistance_HC <100 & Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite$lncpediaHITDistance_HC >-100)
+        dim(Map_to_KnownlncRNAswithin100bpHIGHCONFIDENCE)
+
+# ------- Write out core datasets --------#
+        
+write.csv(InsertCoverage, "InsertCoverage.csv")
+write.csv(CoverageTotals, "CoverageTotals.csv")
+write.csv(CoverageNumberTrue, "NumberofInserts10ReadsORMore.csv")
+write.csv(Normalised_ReadsPerMillion, "Normalised_ReadsPerMillion.csv")
+write.csv(Normalised_ReadsPerMillion_JustDirectionalSupport, "Normalised_ReadsPerMillion_JustDirectionalSupport.csv")
+write.csv(Normalised_ReadsPerMillion_JustConfirmedAan1Sites, "ConfirmedAan1Sites.csv")
+write.csv(Normalised_ReadsPerMillion_JustConfirmedDra1Sites, "ConfirmedDra1Sites.csv")
+write.csv(Normalised_ReadsPerMillion_EitherSite, "EitherREwithin100bp.csv")
+write.csv(Normalised_ReadsPerMillion_DirectionalSupportANDRestrictionSite, "HighestConfidence_RESiteANDDirectionalSupport.csv")
+
+
