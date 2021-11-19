@@ -188,14 +188,112 @@ Normalised_ReadsPerMillion$MF_MFZRatioRPMperKb <- (Normalised_ReadsPerMillion$MF
      median(Normalised_ReadsPerMillion$MF_NoD_Mean)
      legend(x = "topright", c("Density Plot", "Mean", "Median"), col = c("yellow", "royalblue", "red"), lwd = c(2, 2, 2), cex = 0.5)
 
-# Publication Figure 5 data as a box plot
+
+# Publication Figure 5_Revision1
      
-     par(mfrow=c(2,2))
-     boxplot(Normalised_ReadsPerMillion$CL3cMean)
-     boxplot(Normalised_ReadsPerMillion$JCPZMean)
-     boxplot(Normalised_ReadsPerMillion$MFZMean)
-     boxplot(Normalised_ReadsPerMillion$MFMean)
+
+    
+     par(mfrow=c(2,3))
+     options(scipen=999)   
      
+
+     CLC3HistData <- hist(Normalised_ReadsPerMillion$CL3cMean, breaks = c(0,1,2, 3, 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     CLC3HistData$counts
+     CLC3HistData$breaks
+     plot(CLC3HistData$counts, type = "h", col="grey", main="CL3c Library", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", ylim = c(0, 100))
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, ) 
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     
+     
+     JCPZHistData <- hist(Normalised_ReadsPerMillion$JCPZMean, breaks = c(0,1, 2, 3, 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     JCPZHistData$counts
+     JCPZHistData$breaks
+     plot(JCPZHistData$counts, type = "h", col="grey", main="d0 (JCPZ)", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", ylim = c(0, 100))
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, cex="1.5") 
+     
+     
+     MFZHistData <- hist(Normalised_ReadsPerMillion$MFZMean, breaks = c(0,1, 2, 3, 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     MFZHistData$counts
+     MFZHistData$breaks
+     plot(MFZHistData$counts, type = "h", col="grey", main="d47 Continuous Culture (MFZ)", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", ylim = c(0, 100))
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, cex="1.5")
+     
+     
+     MFHistData <- hist(Normalised_ReadsPerMillion$MFMean, breaks = c(0,1, 2, 3, 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     plot(MFHistData$counts, type = "h", col="grey", main="d47 Continuous Culture + anti-FAS (MF)", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", ylim = c(0, 100))
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, cex="1.5")
+     
+     
+     MFNoDHistData <- hist(Normalised_ReadsPerMillion$MF_NoD_Mean, breaks = c(0,1, 2,3 , 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     MFNoDHistData$counts
+     MFNoDHistData$breaks
+     plot(MFNoDHistData$counts, type = "h", col="grey", main="d47 Continuous Culture + anti-FAS (MF) A-C", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", ylim = c(0, 100))
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, cex="1.5") 
+     
+     # Publication Supplementary (S5) - WITH FULL Y AXIS LOG
+     
+     par(mfrow=c(2,3))
+     options(scipen=999)   
+     
+     
+     CLC3HistData <- hist(Normalised_ReadsPerMillion$CL3cMean, breaks = c(0,1,2, 3, 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     CLC3HistData$counts
+     plot(CLC3HistData$counts, type = "h", col="grey", main="CL3c Library", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", log="y", ylim = c(1, 1000000))
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, ) 
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     
+     
+     JCPZHistData <- hist(Normalised_ReadsPerMillion$JCPZMean, breaks = c(0,1, 2, 3, 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     JCPZHistData$counts
+     JCPZHistData$breaks
+     plot(JCPZHistData$counts, type = "h", col="grey", main="d0 (JCPZ)", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", log="y", ylim = c(1, 1000000))
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, cex="1.5") 
+     
+     
+     MFZHistData <- hist(Normalised_ReadsPerMillion$MFZMean, breaks = c(0,1, 2, 3, 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     MFZHistData$counts
+     MFZHistData$breaks
+     plot(MFZHistData$counts, type = "h", col="grey", main="d47 Continuous Culture (MFZ)", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", log="y", ylim = c(1, 1000000))
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, cex="1.5")
+     
+     
+     MFHistData <- hist(Normalised_ReadsPerMillion$MFMean, breaks = c(0,1, 2, 3, 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     plot(MFHistData$counts, type = "h", col="grey", main="d47 Continuous Culture + anti-FAS (MF)", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", log="y", ylim = c(1, 1000000))
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, cex="1.5")
+     
+     
+     MFNoDHistData <- hist(Normalised_ReadsPerMillion$MF_NoD_Mean, breaks = c(0,1, 2,3 , 4,5, 10, 20, 30, 40, 50, 100, 500, 1000, 5000, 10000, 20000, 50000, 100000, 200000), plot = FALSE)
+     MFNoDHistData$breaks
+     plot(MFNoDHistData$counts, type = "h", col="grey", main="d47 Continuous Culture + anti-FAS (MF) A-C", xlab ="", ylab = "Frequency", xaxt = "n", lwd=6, cex.main = "1.2", log="y", ylim = c(1, 1000000))
+     axis(1, at = 1:20, labels = c("0","1","2","3","4", "5", "10","20","30", "40", "50", "100", "500", "1000", "5000" ,"10000", "20000", "50000", "100,000", "200,000"), las=2)
+     lines(CLC3HistData$counts, col="darkblue", lwd="1.5")
+     abline(h = "0", col = "darkblue", lwd = "1")
+     title(xlab = "Reads Mapped to Insert", line = 4, cex="1.5") 
 
 # _________ Complement the expression matrix (Normalised_ReadsPerMillion) with a range of annotation data ___________# 
 
